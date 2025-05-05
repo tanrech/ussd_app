@@ -38,7 +38,6 @@ def ussd():
         return "END ⏰ Session expired. Please try again.", 200, {'Content-Type': 'text/plain'}
 
     try:
-        # MAIN MENU
         if text == "":
             response = (
                 "CON 🌟 Welcome to the Marks Appeal System 🌟\n"
@@ -48,7 +47,6 @@ def ussd():
                 "4. Exit ❌"
             )
 
-        # Option 1: Check marks
         elif text == "1":
             response = "CON 🧾 Enter your Student ID:\n0. Back"
 
@@ -59,19 +57,24 @@ def ussd():
             cur = mysql.connection.cursor()
             cur.execute("SELECT module_name, mark FROM marks WHERE student_id = %s", (student_id,))
             results = cur.fetchall()
-            cur.execute("SELECT status FROM appeals WHERE student_id = %s ORDER BY id DESC LIMIT 1", (student_id,))
+            cur.execute("""
+                SELECT appeal_status.status_name 
+                FROM appeals 
+                JOIN appeal_status ON appeals.status_id = appeal_status.id 
+                WHERE appeals.student_id = %s 
+                ORDER BY appeals.id DESC LIMIT 1
+            """, (student_id,))
             appeal = cur.fetchone()
             cur.close()
 
             if results:
                 marks_msg = "\n".join([f"{row[0]}: {row[1]}" for row in results])
-                if appeal and appeal[0] == "resolved":
+                if appeal and appeal[0].lower() == "resolved":
                     marks_msg += "\n✅ Your marks were re-confirmed."
                 response = f"END 📚 Your Marks:\n{marks_msg}"
             else:
                 response = "END ⚠️ Student ID not found."
 
-        # Option 2: Appeal marks
         elif text == "2":
             response = "CON 🔍 Enter your Student ID to appeal:\n0. Back"
 
@@ -129,13 +132,18 @@ def ussd():
             cur.execute("SELECT module_name FROM marks WHERE student_id = %s", (student_id,))
             modules = [row[0] for row in cur.fetchall()]
             selected_module = modules[module_index]
-            cur.execute("INSERT INTO appeals (student_id, module_name, reason, status) VALUES (%s, %s, %s, %s)",
-                        (student_id, selected_module, reason, 'pending'))
+
+            # Select default status_id (e.g., status_name = "pending")
+            cur.execute("SELECT id FROM appeal_status WHERE status_name = 'pending'")
+            status_row = cur.fetchone()
+            status_id = status_row[0] if status_row else 1  # fallback to 1 if not found
+
+            cur.execute("INSERT INTO appeals (student_id, module_name, reason, status_id) VALUES (%s, %s, %s, %s)",
+                        (student_id, selected_module, reason, status_id))
             mysql.connection.commit()
             cur.close()
             response = "END ✅ Appeal submitted successfully. We’ll review it shortly."
 
-        # Option 3: Check appeal status
         elif text == "3":
             response = "CON 🕵️ Enter your Student ID:\n0. Back"
 
@@ -151,7 +159,13 @@ def ussd():
                     return f"END [Cached] Appeal status: {cached['status']}", 200, {'Content-Type': 'text/plain'}
 
             cur = mysql.connection.cursor()
-            cur.execute("SELECT status FROM appeals WHERE student_id = %s ORDER BY appeal_id DESC LIMIT 1", (student_id,))
+            cur.execute("""
+                SELECT appeal_status.status_name 
+                FROM appeals 
+                JOIN appeal_status ON appeals.status_id = appeal_status.id 
+                WHERE appeals.student_id = %s 
+                ORDER BY appeals.id DESC LIMIT 1
+            """, (student_id,))
             result = cur.fetchone()
             cur.close()
             if result:
@@ -161,7 +175,6 @@ def ussd():
             else:
                 response = "END ❌ No appeal found for this Student ID."
 
-        # Option 4: Exit
         elif text == "4":
             response = "END 👋 Thank you for using our service!"
 
