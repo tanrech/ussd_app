@@ -16,7 +16,6 @@ app.config['MYSQL_PORT'] = 29472
 
 mysql = MySQL(app)
 
-# In-memory session tracking and status caching
 session_timers = {}
 session_status_cache = {}
 
@@ -25,12 +24,9 @@ def ussd():
     session_id = request.form.get("sessionId", "")
     phone_number = request.form.get("phoneNumber", "")
     text = request.form.get("text", "")
-    print("Received USSD:", request.form)
-
     steps = text.split("*")
     level = len(steps)
 
-    # Track session start
     if session_id not in session_timers:
         session_timers[session_id] = time.time()
     elif time.time() - session_timers[session_id] > 180:
@@ -111,20 +107,7 @@ def ussd():
 
         elif level == 4 and steps[0] == "2":
             if steps[3] == "0":
-                student_id = steps[1]
-                cur = mysql.connection.cursor()
-                cur.execute("SELECT module_name, mark FROM marks WHERE student_id = %s", (student_id,))
-                modules = cur.fetchall()
-                cur.close()
-                if modules:
-                    response = "CON ✏️ Select module to appeal:\n"
-                    for i, m in enumerate(modules, 1):
-                        response += f"{i}. {m[0]} ({m[1]})\n"
-                    response += "0. Back"
-                    return response, 200, {'Content-Type': 'text/plain'}
-                else:
-                    return "END ❌ No modules found for this student ID.", 200, {'Content-Type': 'text/plain'}
-
+                return redirect_main_menu()
             student_id = steps[1]
             module_index = int(steps[2]) - 1
             reason = steps[3]
@@ -132,12 +115,9 @@ def ussd():
             cur.execute("SELECT module_name FROM marks WHERE student_id = %s", (student_id,))
             modules = [row[0] for row in cur.fetchall()]
             selected_module = modules[module_index]
-
-            # Select default status_id (e.g., status_name = "pending")
             cur.execute("SELECT id FROM appeal_status WHERE status_name = 'pending'")
             status_row = cur.fetchone()
-            status_id = status_row[0] if status_row else 1  # fallback to 1 if not found
-
+            status_id = status_row[0] if status_row else 1
             cur.execute("INSERT INTO appeals (student_id, module_name, reason, status_id) VALUES (%s, %s, %s, %s)",
                         (student_id, selected_module, reason, status_id))
             mysql.connection.commit()
