@@ -4,15 +4,19 @@ import MySQLdb.cursors
 import hashlib
 import os
 
+
+
+
+
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key'  # Change for production use
 
 # ✅ Railway MySQL configuration
-app.config['MYSQL_HOST'] = 'crossover.proxy.rlwy.net'
+app.config['MYSQL_HOST'] = 'shuttle.proxy.rlwy.net'
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'BBYoZaaPxAdwlLnJzHzaowpwXZBWMhCG'
+app.config['MYSQL_PASSWORD'] = 'XchZGCahQrMQifPOTxFXFmdrWjBMaEhg'
 app.config['MYSQL_DB'] = 'railway'
-app.config['MYSQL_PORT'] = 29472
+app.config['MYSQL_PORT'] =28780
 
 mysql = MySQL(app)
 
@@ -40,6 +44,8 @@ def login():
         else:
             msg = '⚠️ Incorrect username or password!'
     return render_template('login.html', msg=msg)
+  
+
 
 # ---------- Admin Dashboard ----------
 @app.route('/admin/dashboard')

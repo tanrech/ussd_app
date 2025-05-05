@@ -8,11 +8,11 @@ app = Flask(__name__)
 app.secret_key = "secret-key"
 
 # MySQL configuration
-app.config['MYSQL_HOST'] = "crossover.proxy.rlwy.net"
+app.config['MYSQL_HOST'] = "shuttle.proxy.rlwy.net"
 app.config['MYSQL_USER'] = "root"
-app.config['MYSQL_PASSWORD'] = "BBYoZaaPxAdwlLnJzHzaowpwXZBWMhCG"
+app.config['MYSQL_PASSWORD'] = "XchZGCahQrMQifPOTxFXFmdrWjBMaEhg"
 app.config['MYSQL_DB'] = "railway"
-app.config['MYSQL_PORT'] = 29472
+app.config['MYSQL_PORT'] = 28780
 
 mysql = MySQL(app)
 
