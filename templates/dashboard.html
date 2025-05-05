@@ -20,7 +20,8 @@
         <tr>
             <th>ID</th>
             <th>Student ID</th>
-            <th>Appeal</th>
+            <th>Module</th>
+            <th>Reason</th>
             <th>Status</th>
             <th>Update</th>
         </tr>
@@ -28,17 +29,20 @@
         <tr>
             <td>{{ appeal.id }}</td>
             <td>{{ appeal.student_id }}</td>
-            <td>{{ appeal.message }}</td>
-            <td>{{ appeal.status_id }}</td>
+            <td>{{ appeal.module_name }}</td>
+            <td>{{ appeal.reason }}</td>
+            <td>{{ appeal.status_name or 'Pending' }}</td>
             <td>
-                <form action="{{ url_for('update_status', appeal_id=appeal.id) }}" method="POST">
-                    <select name="status" required>
-                        <option value="">Select</option>
-                        <option value="Approved">Approved</option>
-                        <option value="Rejected">Rejected</option>
+                <form method="POST" action="{{ url_for('update_status', appeal_id=appeal.id) }}">
+                    <select name="status">
+                        {% for status in status_options %}
+                            <option value="{{ status.status_name }}" {% if appeal.status_name == status.status_name %}selected{% endif %}>
+                                {{ status.status_name }}
+                            </option>
+                        {% endfor %}
                     </select>
                     <button type="submit">Update</button>
-                </form>
+                </form>                
             </td>
         </tr>
         {% endfor %}

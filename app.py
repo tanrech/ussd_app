@@ -2,9 +2,10 @@ from flask import Flask, request, render_template, redirect, session, url_for, f
 from flask_mysqldb import MySQL
 import MySQLdb.cursors
 import hashlib
+import os
 
 app = Flask(__name__)
-app.secret_key = 'your_super_secret_key'  # Change this for production use
+app.secret_key = 'your_super_secret_key'  # Change for production use
 
 # ✅ Railway MySQL configuration
 app.config['MYSQL_HOST'] = 'crossover.proxy.rlwy.net'
@@ -15,7 +16,7 @@ app.config['MYSQL_PORT'] = 29472
 
 mysql = MySQL(app)
 
-# ✅ Admin Login
+# ---------- Admin Login ----------
 @app.route('/admin/login', methods=['GET', 'POST'])
 def login():
     if session.get('loggedin'):
@@ -31,6 +32,7 @@ def login():
         cursor.execute('SELECT * FROM admins WHERE username = %s AND password = %s',
                        (username, hashed_password))
         admin = cursor.fetchone()
+
         if admin:
             session['loggedin'] = True
             session['username'] = admin['username']
@@ -39,38 +41,56 @@ def login():
             msg = '⚠️ Incorrect username or password!'
     return render_template('login.html', msg=msg)
 
-# ✅ Admin Dashboard
+# ---------- Admin Dashboard ----------
 @app.route('/admin/dashboard')
 def dashboard():
     if not session.get('loggedin'):
         return redirect(url_for('login'))
 
     cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-    cursor.execute("SELECT * FROM appeals ORDER BY id DESC")
+    cursor.execute("""
+        SELECT appeals.*, appeal_status.status_name 
+        FROM appeals 
+        LEFT JOIN appeal_status ON appeals.status_id = appeal_status.id 
+        ORDER BY appeals.id DESC
+    """)
     appeals = cursor.fetchall()
-    return render_template('dashboard.html', appeals=appeals)
 
-# ✅ Update Appeal Status
+    cursor.execute("SELECT * FROM appeal_status")
+    status_options = cursor.fetchall()
+
+    return render_template('dashboard.html', appeals=appeals, status_options=status_options)
+
+# ---------- Update Appeal Status ----------
 @app.route('/admin/update_status/<int:appeal_id>', methods=['POST'])
 def update_status(appeal_id):
     if not session.get('loggedin'):
         return redirect(url_for('login'))
 
-    new_status = request.form.get('status')  # status can be 'Approved' or 'Rejected'
+    status_name = request.form.get('status')
     cursor = mysql.connection.cursor()
-    cursor.execute("UPDATE appeals SET status_id = %s WHERE id = %s", (new_status, appeal_id))
-    mysql.connection.commit()
-    flash('✅ Appeal status updated successfully!', 'success')
+
+    cursor.execute("SELECT id FROM appeal_status WHERE status_name = %s", (status_name,))
+    result = cursor.fetchone()
+
+    if result:
+        status_id = result[0]
+        cursor.execute("UPDATE appeals SET status_id = %s WHERE id = %s", (status_id, appeal_id))
+        mysql.connection.commit()
+        flash('✅ Appeal status updated successfully!', 'success')
+    else:
+        flash('❌ Invalid status selected.', 'danger')
+
     return redirect(url_for('dashboard'))
 
-# ✅ Logout
+# ---------- Logout ----------
 @app.route('/logout')
 def logout():
     session.pop('loggedin', None)
     session.pop('username', None)
     return redirect(url_for('login'))
 
-# ✅ USSD Logic
+# ---------- USSD Endpoint ----------
 @app.route("/ussd", methods=["POST"])
 def ussd():
     session_id = request.form.get("sessionId", "")
@@ -81,14 +101,20 @@ def ussd():
 
     if text == "":
         return "CON Welcome to the Appeal Status Checker\n1. Check Appeal Status"
-    
+
     elif text == "1":
         return "CON Please enter your Student ID"
 
     elif len(user_response) == 2 and user_response[0] == "1":
         student_id = user_response[1]
         cursor = mysql.connection.cursor()
-        cursor.execute("SELECT status_id FROM appeals WHERE student_id = %s ORDER BY id DESC LIMIT 1", (student_id,))
+        cursor.execute("""
+            SELECT appeal_status.status_name 
+            FROM appeals 
+            LEFT JOIN appeal_status ON appeals.status_id = appeal_status.id 
+            WHERE student_id = %s 
+            ORDER BY appeals.id DESC LIMIT 1
+        """, (student_id,))
         result = cursor.fetchone()
 
         if result:
@@ -100,9 +126,7 @@ def ussd():
     else:
         return "END ❌ Invalid input. Please try again."
 
-# ✅ Run the app
-import os
-
+# ---------- Run App ----------
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=True, host='0.0.0.0', port=port)
